@@ -129,7 +129,6 @@ void open3dToRos(const open3d::tgeometry::PointCloud& pointcloud, sensor_msgs::P
     sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_r(ros_pc2, "r");
     sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_g(ros_pc2, "g");
     sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_b(ros_pc2, "b");
-      std::clock_t tic = std::clock();
     for (size_t i = 0; i < o3d_TensorList_points.GetSize();
          i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_r, ++ros_pc2_g, ++ros_pc2_b)
     {
