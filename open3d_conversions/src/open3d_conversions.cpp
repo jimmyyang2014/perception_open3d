@@ -117,39 +117,40 @@ void open3dToRos(const open3d::tgeometry::PointCloud& pointcloud, sensor_msgs::P
   {
     modifier.setPointCloud2FieldsByString(1, "xyz");
   }
-  open3d::core::TensorList o3d_TensorList_points = pointcloud.GetPoints();
-  modifier.resize(o3d_TensorList_points.GetSize());
+  const open3d::core::TensorList& o3d_TensorList_points = pointcloud.GetPointAttr("points");
+  modifier.resize(pointcloud.GetPoints().GetSize());
   ros_pc2.header.frame_id = frame_id;
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_x(ros_pc2, "x");
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_y(ros_pc2, "y");
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_z(ros_pc2, "z");
   if (pointcloud.HasPointColors())
   {
-    open3d::core::TensorList o3d_TensorList_colors = pointcloud.GetPointColors();
+    const open3d::core::TensorList &o3d_TensorList_colors = pointcloud.GetPointAttr("colors");
     sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_r(ros_pc2, "r");
     sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_g(ros_pc2, "g");
     sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_b(ros_pc2, "b");
+      std::clock_t tic = std::clock();
     for (size_t i = 0; i < o3d_TensorList_points.GetSize();
          i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_r, ++ros_pc2_g, ++ros_pc2_b)
     {
-      const Eigen::Vector3d& point = open3d::core::eigen_converter::TensorToEigenVector3d(o3d_TensorList_points[i]);
-      const Eigen::Vector3d& color = open3d::core::eigen_converter::TensorToEigenVector3d(o3d_TensorList_colors[i]);
-      *ros_pc2_x = point(0);
-      *ros_pc2_y = point(1);
-      *ros_pc2_z = point(2);
-      *ros_pc2_r = (int)(255 * color(0));
-      *ros_pc2_g = (int)(255 * color(1));
-      *ros_pc2_b = (int)(255 * color(2));
+      open3d::core::Tensor point=o3d_TensorList_points[i];
+      open3d::core::Tensor color=o3d_TensorList_colors[i];    
+      *ros_pc2_x = point[0].Item<float>();
+      *ros_pc2_y = point[1].Item<float>();
+      *ros_pc2_z = point[2].Item<float>();
+      *ros_pc2_r = (int)(255 * color[0].Item<float>());
+      *ros_pc2_g = (int)(255 * color[1].Item<float>());
+      *ros_pc2_b = (int)(255 * color[2].Item<float>());
     }
   }
   else
   {
     for (size_t i = 0; i < o3d_TensorList_points.GetSize(); i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z)
     {
-      const Eigen::Vector3d& point = open3d::core::eigen_converter::TensorToEigenVector3d(o3d_TensorList_points[i]);
-      *ros_pc2_x = point(0);
-      *ros_pc2_y = point(1);
-      *ros_pc2_z = point(2);
+      open3d::core::Tensor point=o3d_TensorList_points[i];
+      *ros_pc2_x = point[0].Item<float>();
+      *ros_pc2_y = point[1].Item<float>();
+      *ros_pc2_z = point[2].Item<float>();
     }
   }
 }
@@ -215,3 +216,4 @@ void rosToOpen3d(const sensor_msgs::PointCloud2ConstPtr& ros_pc2, open3d::tgeome
   }
 }
 }    // namespace open3d_conversions
+
