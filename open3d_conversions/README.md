@@ -30,7 +30,7 @@ void open3d_conversions::open3dToRos(const open3d::geometry::PointCloud& pointcl
 
 void open3d_conversions::rosToOpen3d(const sensor_msgs::PointCloud2ConstPtr& ros_pc2, open3d::geometry::PointCloud& o3d_pc, bool skip_colors=false);
 
-void open3dToRos(const open3d::tgeometry::PointCloud& pointcloud, sensor_msgs::PointCloud2& ros_pc2, std::string frame_id = "open3d_pointcloud", int t_num_fields=2, ... );
+void open3d_conversions::open3dToRos(const open3d::tgeometry::PointCloud& pointcloud, sensor_msgs::PointCloud2& ros_pc2, std::string frame_id = "open3d_pointcloud", int t_num_fields=2, ... );
 
 void open3d_conversions::rosToOpen3d(const sensor_msgs::PointCloud2ConstPtr& ros_pc2, open3d::tgeometry::PointCloud& o3d_pc, bool skip_colors=false);
 ```
