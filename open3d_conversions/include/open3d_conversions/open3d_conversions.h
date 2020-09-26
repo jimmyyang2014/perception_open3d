@@ -56,9 +56,11 @@ void rosToOpen3d(const sensor_msgs::PointCloud2ConstPtr& ros_pc2, open3d::geomet
 *@param pointcloud Reference to the open3d tgeometry PointCloud
 *@param ros_pc2 Reference to the sensor_msgs PointCloud2
 *@param frame_id The string to be placed in the frame_id of the PointCloud2
+*@param num_fields Twice the number of fields that the pointcloud contains
+*@param var_args Strings of field names followed succeeded by their datatype ("int" / "float") 
 */
 void open3dToRos(const open3d::tgeometry::PointCloud& pointcloud, sensor_msgs::PointCloud2& ros_pc2,
-                 std::string frame_id = "open3d_pointcloud");
+                 std::string frame_id = "open3d_pointcloud", int t_num_fields=1, ... );
 
 /**
  * @brief Copy data from a sensor_msgs::PointCloud2 to a open3d::tgeometry::PointCloud

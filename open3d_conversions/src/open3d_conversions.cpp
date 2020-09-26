@@ -106,51 +106,124 @@ void rosToOpen3d(const sensor_msgs::PointCloud2ConstPtr& ros_pc2, open3d::geomet
   }
 }
 void open3dToRos(const open3d::tgeometry::PointCloud& pointcloud, sensor_msgs::PointCloud2& ros_pc2,
-                 std::string frame_id)
+                 std::string frame_id, int t_num_fields, ...)
 {
   sensor_msgs::PointCloud2Modifier modifier(ros_pc2);
-  if (pointcloud.HasPointColors())
+  ros_pc2.fields.reserve(t_num_fields);
+  va_list vl;
+  va_start(vl, t_num_fields);
+  int offset = 0;
+  std::vector<std::string> field_names;
+  std::vector<std::string> data_types;
+  for (int i = 0; i < t_num_fields - 1; ++i)
   {
-    modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
-  }
-  else
-  {
-    modifier.setPointCloud2FieldsByString(1, "xyz");
+    std::string field_name = std::string(va_arg(vl, char*));
+    field_names.push_back(field_name);
+    i++;
+    std::string data_type = std::string(va_arg(vl, char*));
+    data_types.push_back(data_type);
+    if (field_name == "xyz")
+    {
+      modifier.setPointCloud2FieldsByString(1, "xyz");
+    }
+    else
+    {
+      if ((field_name == "rgb") || (field_name == "rgba"))
+      {
+        modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
+      }
+      else
+      {
+        if (data_type == "float")
+        {
+          offset = addPointField(ros_pc2, field_name + "_x", 1, sensor_msgs::PointField::FLOAT32, offset);
+          offset = addPointField(ros_pc2, field_name + "_y", 1, sensor_msgs::PointField::FLOAT32, offset);
+          offset = addPointField(ros_pc2, field_name + "_z", 1, sensor_msgs::PointField::FLOAT32, offset);
+          offset += sizeOfPointField(sensor_msgs::PointField::FLOAT32);
+        }
+        else if (data_type == "int")
+        {
+          offset = addPointField(ros_pc2, field_name + "_x", 1, sensor_msgs::PointField::INT8, offset);
+          offset = addPointField(ros_pc2, field_name + "_y", 1, sensor_msgs::PointField::INT8, offset);
+          offset = addPointField(ros_pc2, field_name + "_z", 1, sensor_msgs::PointField::INT8, offset);
+          offset += sizeOfPointField(sensor_msgs::PointField::INT8);
+        }
+        else
+        {
+          throw std::runtime_error("datatype" + data_type + " does not exist");
+        }
+      }
+    }
+    va_end(vl);
   }
   const open3d::core::TensorList& o3d_TensorList_points = pointcloud.GetPointAttr("points");
   modifier.resize(pointcloud.GetPoints().GetSize());
+  ros_pc2.data.reserve(pointcloud.GetPoints().GetSize());
   ros_pc2.header.frame_id = frame_id;
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_x(ros_pc2, "x");
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_y(ros_pc2, "y");
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_z(ros_pc2, "z");
-  if (pointcloud.HasPointColors())
+  int count = 0;
+  for (auto field_name = field_names.begin(); field_name != field_names.end(); ++field_name)
   {
-    const open3d::core::TensorList &o3d_TensorList_colors = pointcloud.GetPointAttr("colors");
-    sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_r(ros_pc2, "r");
-    sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_g(ros_pc2, "g");
-    sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_b(ros_pc2, "b");
-    for (size_t i = 0; i < o3d_TensorList_points.GetSize();
-         i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_r, ++ros_pc2_g, ++ros_pc2_b)
+    std::string data_type = data_types[count];
+    if (*field_name == "xyz")
     {
-      open3d::core::Tensor point=o3d_TensorList_points[i];
-      open3d::core::Tensor color=o3d_TensorList_colors[i];    
-      *ros_pc2_x = point[0].Item<float>();
-      *ros_pc2_y = point[1].Item<float>();
-      *ros_pc2_z = point[2].Item<float>();
-      *ros_pc2_r = (int)(255 * color[0].Item<float>());
-      *ros_pc2_g = (int)(255 * color[1].Item<float>());
-      *ros_pc2_b = (int)(255 * color[2].Item<float>());
+      for (size_t i = 0; i < o3d_TensorList_points.GetSize(); i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z)
+      {
+        open3d::core::Tensor point = o3d_TensorList_points[i];
+        *ros_pc2_x = point[0].Item<float>();
+        *ros_pc2_y = point[1].Item<float>();
+        *ros_pc2_z = point[2].Item<float>();
+      }
     }
-  }
-  else
-  {
-    for (size_t i = 0; i < o3d_TensorList_points.GetSize(); i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z)
+    else if (*field_name == "rgb")
     {
-      open3d::core::Tensor point=o3d_TensorList_points[i];
-      *ros_pc2_x = point[0].Item<float>();
-      *ros_pc2_y = point[1].Item<float>();
-      *ros_pc2_z = point[2].Item<float>();
+      const open3d::core::TensorList& o3d_TensorList_colors = pointcloud.GetPointAttr("colors");
+      sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_r(ros_pc2, "r");
+      sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_g(ros_pc2, "g");
+      sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_b(ros_pc2, "b");
+      for (size_t i = 0; i < o3d_TensorList_points.GetSize(); i++, ++ros_pc2_r, ++ros_pc2_g, ++ros_pc2_b)
+      {
+        open3d::core::Tensor color = o3d_TensorList_colors[i];
+        *ros_pc2_r = (int)(255 * color[0].Item<float>());
+        *ros_pc2_g = (int)(255 * color[1].Item<float>());
+        *ros_pc2_b = (int)(255 * color[2].Item<float>());
+      }
     }
+    else
+    {
+      const open3d::core::TensorList& o3d_TensorList_fields = pointcloud.GetPointAttr(*field_name);
+      if (data_type == "int")
+      {
+        sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_fx(ros_pc2, *field_name + "_x");
+        sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_fy(ros_pc2, *field_name + "_y");
+        sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_fz(ros_pc2, *field_name + "_z");
+        for (size_t i = 0; i < o3d_TensorList_points.GetSize();
+             i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_fx, ++ros_pc2_fy, ++ros_pc2_fz)
+        {
+          open3d::core::Tensor field_tensor = o3d_TensorList_points[i];
+          *ros_pc2_fx = field_tensor[0].Item<int>();
+          *ros_pc2_fy = field_tensor[1].Item<int>();
+          *ros_pc2_fz = field_tensor[2].Item<int>();
+        }
+      }
+      else if (data_type == "float")
+      {
+        sensor_msgs::PointCloud2Iterator<float> ros_pc2_fx(ros_pc2, *field_name + "_x");
+        sensor_msgs::PointCloud2Iterator<float> ros_pc2_fy(ros_pc2, *field_name + "_y");
+        sensor_msgs::PointCloud2Iterator<float> ros_pc2_fz(ros_pc2, *field_name + "_z");
+        for (size_t i = 0; i < o3d_TensorList_points.GetSize();
+             i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_fx, ++ros_pc2_fy, ++ros_pc2_fz)
+        {
+          open3d::core::Tensor field_tensor = o3d_TensorList_points[i];
+          *ros_pc2_fx = field_tensor[0].Item<float>();
+          *ros_pc2_fy = field_tensor[1].Item<float>();
+          *ros_pc2_fz = field_tensor[2].Item<float>();
+        }
+      }
+    }
+    count++;
   }
 }
 
@@ -160,59 +233,130 @@ void rosToOpen3d(const sensor_msgs::PointCloud2ConstPtr& ros_pc2, open3d::tgeome
   sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_x(*ros_pc2, "x");
   sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_y(*ros_pc2, "y");
   sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_z(*ros_pc2, "z");
-  open3d::core::Dtype dtype_f = open3d::core::Dtype::Float64;
+  open3d::core::Dtype dtype_f = open3d::core::Dtype::Float32;
+  open3d::core::Dtype dtype_lf = open3d::core::Dtype::Float64;
   open3d::core::Device device_type(open3d::core::Device::DeviceType::CPU, 0);
-  if (ros_pc2->fields.size() == 3 || skip_colors == true)
+  for (int num_fields = 0; num_fields < ros_pc2->fields.size(); num_fields++)
   {
-    open3d::core::TensorList o3d_TensorList_points({ 3 }, dtype_f, device_type);
-    for (size_t i = 0; i < ros_pc2->height * ros_pc2->width; ++i, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z)
+    if (ros_pc2->fields[num_fields].name == "x")
     {
-      open3d::core::Tensor o3d_tpc_points = open3d::core::eigen_converter::EigenVector3dToTensor(
-        Eigen::Vector3d(*ros_pc2_x, *ros_pc2_y, *ros_pc2_z), dtype_f, device_type);
-      o3d_TensorList_points.PushBack(o3d_tpc_points);
+      open3d::core::TensorList o3d_TensorList_points({ 3 }, dtype_f, device_type);
+      for (size_t i = 0; i < ros_pc2->height * ros_pc2->width; ++i, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z)
+      {
+        open3d::core::Tensor o3d_tpc_points = open3d::core::eigen_converter::EigenVector3dToTensor(
+          Eigen::Vector3d(*ros_pc2_x, *ros_pc2_y, *ros_pc2_z), dtype_f, device_type);
+        o3d_TensorList_points.PushBack(o3d_tpc_points);
+      }
+      o3d_tpc.SetPoints(o3d_TensorList_points);
+      num_fields++;
+      num_fields++;
     }
-    o3d_tpc.SetPoints(o3d_TensorList_points);
-  }
-  else
-  {
-    if (ros_pc2->fields[3].name == "rgb")
+    else if (ros_pc2->fields[num_fields].name == "rgb" && !skip_colors)
     {
       sensor_msgs::PointCloud2ConstIterator<uint8_t> ros_pc2_r(*ros_pc2, "r");
       sensor_msgs::PointCloud2ConstIterator<uint8_t> ros_pc2_g(*ros_pc2, "g");
       sensor_msgs::PointCloud2ConstIterator<uint8_t> ros_pc2_b(*ros_pc2, "b");
-      open3d::core::TensorList o3d_TensorList_colors({ 3 }, dtype_f, device_type);
-      open3d::core::TensorList o3d_TensorList_points({ 3 }, dtype_f, device_type);
-      for (size_t i = 0; i < ros_pc2->height * ros_pc2->width;
-           ++i, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_r, ++ros_pc2_g, ++ros_pc2_b)
+      open3d::core::TensorList o3d_TensorList_colors({ 3 }, dtype_lf, device_type);
+      for (size_t i = 0; i < ros_pc2->height * ros_pc2->width; ++i, ++ros_pc2_r, ++ros_pc2_g, ++ros_pc2_b)
       {
-        open3d::core::Tensor o3d_tpc_points = open3d::core::eigen_converter::EigenVector3dToTensor(
-          Eigen::Vector3d(*ros_pc2_x, *ros_pc2_y, *ros_pc2_z), dtype_f, device_type);
         open3d::core::Tensor o3d_tpc_colors = open3d::core::eigen_converter::EigenVector3dToTensor(
           Eigen::Vector3d(((int)(*ros_pc2_r)) / 255.0, ((int)(*ros_pc2_g)) / 255.0, ((int)(*ros_pc2_b)) / 255.0),
-          dtype_f, device_type);
-        o3d_TensorList_points.PushBack(o3d_tpc_points);
+          dtype_lf, device_type);
         o3d_TensorList_colors.PushBack(o3d_tpc_colors);
       }
-      o3d_tpc.SetPoints(o3d_TensorList_points);
       o3d_tpc.SetPointColors(o3d_TensorList_colors);
     }
-    else if (ros_pc2->fields[3].name == "intensity")
+    else
     {
-      sensor_msgs::PointCloud2ConstIterator<uint8_t> ros_pc2_i(*ros_pc2, "intensity");
-      open3d::core::TensorList o3d_TensorList_intensity({ 3 }, dtype_f, device_type);
-      open3d::core::TensorList o3d_TensorList_points({ 3 }, dtype_f, device_type);
-      for (size_t i = 0; i < ros_pc2->height * ros_pc2->width; ++i, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_i)
+      
+      if (ros_pc2->fields[num_fields].datatype == sensor_msgs::PointField::UINT8 ||
+          ros_pc2->fields[num_fields].datatype == sensor_msgs::PointField::INT8)
       {
-        open3d::core::Tensor o3d_tpc_points = open3d::core::eigen_converter::EigenVector3dToTensor(
-          Eigen::Vector3d(*ros_pc2_x, *ros_pc2_y, *ros_pc2_z), dtype_f, device_type);
-        open3d::core::Tensor o3d_tpc_intensity = open3d::core::eigen_converter::EigenVector3dToTensor(
-          Eigen::Vector3d(*ros_pc2_i, *ros_pc2_i, *ros_pc2_i), dtype_f, device_type);
-        o3d_TensorList_points.PushBack(o3d_tpc_points);
+      	open3d::core::TensorList o3d_TensorList_fields({ 3 }, dtype_f, device_type);
+        sensor_msgs::PointCloud2ConstIterator<uint8_t> ros_pc2_fx(*ros_pc2, ros_pc2->fields[num_fields].name);
+        sensor_msgs::PointCloud2ConstIterator<uint8_t> ros_pc2_fy(*ros_pc2, ros_pc2->fields[num_fields].name);
+        sensor_msgs::PointCloud2ConstIterator<uint8_t> ros_pc2_fz(*ros_pc2, ros_pc2->fields[num_fields].name);
+        for (size_t i = 0; i < ros_pc2->height * ros_pc2->width; ++i, ++ros_pc2_fx, ++ros_pc2_fy, ++ros_pc2_fz)
+        {
+          open3d::core::Tensor o3d_tpc_fields = open3d::core::eigen_converter::EigenVector3dToTensor(
+            Eigen::Vector3d(*ros_pc2_fx, *ros_pc2_fy, *ros_pc2_fz), dtype_f, device_type);
+          o3d_TensorList_fields.PushBack(o3d_tpc_fields);
+        }
+        o3d_tpc.SetPointAttr(ros_pc2->fields[num_fields].name, o3d_TensorList_fields);
       }
-      o3d_tpc.SetPoints(o3d_TensorList_points);
-      o3d_tpc.SetPointColors(o3d_TensorList_intensity);
+      else if (ros_pc2->fields[num_fields].datatype == sensor_msgs::PointField::FLOAT32)
+      {
+      	open3d::core::TensorList o3d_TensorList_fields({ 3 }, dtype_f, device_type);
+        sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_fx(*ros_pc2, ros_pc2->fields[num_fields].name);
+        sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_fy(*ros_pc2, ros_pc2->fields[num_fields].name);
+        sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_fz(*ros_pc2, ros_pc2->fields[num_fields].name);
+        for (size_t i = 0; i < ros_pc2->height * ros_pc2->width; ++i, ++ros_pc2_fx, ++ros_pc2_fy, ++ros_pc2_fz)
+        {
+          open3d::core::Tensor o3d_tpc_fields = open3d::core::eigen_converter::EigenVector3dToTensor(
+            Eigen::Vector3d(*ros_pc2_fx, *ros_pc2_fy, *ros_pc2_fz), dtype_f, device_type);
+          o3d_TensorList_fields.PushBack(o3d_tpc_fields);
+        }
+        o3d_tpc.SetPointAttr(ros_pc2->fields[num_fields].name, o3d_TensorList_fields);
+      }
+      else
+      {
+      	open3d::core::TensorList o3d_TensorList_fields({ 3 }, dtype_f, device_type);
+      	sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_fx(*ros_pc2, ros_pc2->fields[num_fields].name);
+        sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_fy(*ros_pc2, ros_pc2->fields[num_fields].name);
+        sensor_msgs::PointCloud2ConstIterator<float> ros_pc2_fz(*ros_pc2, ros_pc2->fields[num_fields].name);
+        for (size_t i = 0; i < ros_pc2->height * ros_pc2->width; ++i, ++ros_pc2_fx, ++ros_pc2_fy, ++ros_pc2_fz)
+        {
+          open3d::core::Tensor o3d_tpc_fields = open3d::core::eigen_converter::EigenVector3dToTensor(
+            Eigen::Vector3d(*ros_pc2_fx, *ros_pc2_fy, *ros_pc2_fz), dtype_lf, device_type);
+          o3d_TensorList_fields.PushBack(o3d_tpc_fields);
+        }
+        o3d_tpc.SetPointAttr(ros_pc2->fields[num_fields].name, o3d_TensorList_fields);
+      }
     }
   }
 }
 }    // namespace open3d_conversions
 
+inline int addPointField(sensor_msgs::PointCloud2& cloud_msg, const std::string& name, int count, int datatype,
+                         int offset) 
+
+{
+  sensor_msgs::PointField point_field;
+  point_field.name = name;
+  point_field.count = count;
+  point_field.datatype = datatype;
+  point_field.offset = offset;
+  cloud_msg.fields.push_back(point_field);
+
+  // Update the offset
+  return offset + point_field.count * sizeOfPointField(datatype);
+}
+
+inline int sizeOfPointField(int datatype)
+{
+  if ((datatype == sensor_msgs::PointField::INT8) || (datatype == sensor_msgs::PointField::UINT8))
+  {
+    return 1;
+  }
+  else if ((datatype == sensor_msgs::PointField::INT16) ||    // NOLINT
+           (datatype == sensor_msgs::PointField::UINT16))
+  {
+    return 2;
+  }
+  else if ((datatype == sensor_msgs::PointField::INT32) ||    // NOLINT
+           (datatype == sensor_msgs::PointField::UINT32) || (datatype == sensor_msgs::PointField::FLOAT32))
+  {
+    return 4;
+  }
+  else if (datatype == sensor_msgs::PointField::FLOAT64)
+  {
+    return 8;
+  }
+  else
+  {
+    std::stringstream err;
+    err << "PointField of type " << datatype << " does not exist";
+    throw std::runtime_error(err.str());
+  }
+  return -1;
+}

@@ -166,7 +166,7 @@ TEST(ConversionFunctions, rosToOpen3d_colored)
 TEST(ConversionFunctionsTgeometry, open3dToRos_uncolored_tgeometry)
 {
   open3d::tgeometry::PointCloud o3d_tpc;
-  open3d::core::Dtype dtype_f = open3d::core::Dtype::Float64;
+  open3d::core::Dtype dtype_f = open3d::core::Dtype::Float32;
   open3d::core::Device device_type(open3d::core::Device::DeviceType::CPU, 0);
   open3d::core::TensorList o3d_TensorList_points({ 3 }, dtype_f, device_type);
   for (int i = 0; i < 5; ++i)
@@ -177,7 +177,7 @@ TEST(ConversionFunctionsTgeometry, open3dToRos_uncolored_tgeometry)
   }
   o3d_tpc.SetPoints(o3d_TensorList_points);
   sensor_msgs::PointCloud2 ros_pc2;
-  open3d_conversions::open3dToRos(o3d_tpc, ros_pc2, "o3d_frame");
+  open3d_conversions::open3dToRos(o3d_tpc, ros_pc2, "o3d_frame", 2, "xyz", "float");
   EXPECT_EQ(ros_pc2.height * ros_pc2.width, o3d_TensorList_points.GetSize());
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_x(ros_pc2, "x");
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_y(ros_pc2, "y");
@@ -193,7 +193,7 @@ TEST(ConversionFunctionsTgeometry, open3dToRos_uncolored_tgeometry)
 TEST(ConversionFunctionsTgeometry, open3dToRos_colored_tgeometry)
 {
   open3d::tgeometry::PointCloud o3d_tpc;
-  open3d::core::Dtype dtype_f = open3d::core::Dtype::Float64;
+  open3d::core::Dtype dtype_f = open3d::core::Dtype::Float32;
   open3d::core::Device device_type(open3d::core::Device::DeviceType::CPU, 0);
   open3d::core::TensorList o3d_TensorList_points({ 3 }, dtype_f, device_type);
   open3d::core::TensorList o3d_TensorList_colors({ 3 }, dtype_f, device_type);
@@ -209,8 +209,8 @@ TEST(ConversionFunctionsTgeometry, open3dToRos_colored_tgeometry)
   o3d_tpc.SetPoints(o3d_TensorList_points);
   o3d_tpc.SetPointColors(o3d_TensorList_colors);
   sensor_msgs::PointCloud2 ros_pc2;
-  open3d_conversions::open3dToRos(o3d_tpc, ros_pc2, "o3d_frame");
-  EXPECT_EQ(ros_pc2.height * ros_pc2.width, o3d_TensorList_points.GetSize());
+  open3d_conversions::open3dToRos(o3d_tpc, ros_pc2, "o3d_frame", 4, "xyz", "float", "rgb", "float");
+  EXPECT_EQ(ros_pc2.height * ros_pc2.width, o3d_tpc.GetPoints().GetSize());
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_x(ros_pc2, "x");
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_y(ros_pc2, "y");
   sensor_msgs::PointCloud2Iterator<float> ros_pc2_z(ros_pc2, "z");
@@ -255,7 +255,7 @@ TEST(ConversionFunctionsTgeometry, rosToOpen3d_uncolored_tgeometry)
   open3d::tgeometry::PointCloud o3d_tpc;
   open3d_conversions::rosToOpen3d(ros_pc2_ptr, o3d_tpc);
   open3d::core::TensorList o3d_TensorList_points = o3d_tpc.GetPoints();
-  EXPECT_EQ(ros_pc2_ptr->height * ros_pc2_ptr->width, o3d_TensorList_points.GetSize());
+  EXPECT_EQ(ros_pc2_ptr->height * ros_pc2_ptr->width, o3d_tpc.GetPoints().GetSize());
   EXPECT_EQ(o3d_tpc.HasPointColors(), false);
   for (unsigned int i = 0; i < 5; i++)
   {
